@@ -1,0 +1,17 @@
+{
+  "name": "mail-tracker",
+  "private": true,
+  "description": "Mail Tracker monorepo: React Native client + Node API (see README).",
+  "scripts": {
+    "postinstall": "npm install --prefix packages/shared && npm install --prefix apps/api && npm install --prefix apps/mobile",
+    "build": "npm run build --prefix packages/shared && npm run build --prefix apps/api",
+    "dev:api": "npm run dev --prefix apps/api",
+    "dev:mobile": "npm run start --prefix apps/mobile",
+    "lint": "npm run lint --prefix packages/shared && npm run lint --prefix apps/api",
+    "typecheck": "npm run typecheck --prefix packages/shared && npm run typecheck --prefix apps/api"
+  },
+  "engines": {
+    "node": ">=20.10.0",
+    "npm": ">=9.0.0"
+  }
+}
