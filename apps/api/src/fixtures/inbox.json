@@ -1,0 +1,90 @@
+[
+  {
+    "messageId": "fixture-0001",
+    "threadId": "thread-0001",
+    "fromAddr": "billing@stripe.com",
+    "fromName": "Stripe",
+    "subject": "Your receipt from Acme Inc. — $49.00",
+    "snippet": "Thanks for your payment. Your invoice #A-1042 has been paid. View or download your receipt anytime.",
+    "receivedAtMs": 1721600000000,
+    "isUnread": true,
+    "hasAttachment": true
+  },
+  {
+    "messageId": "fixture-0002",
+    "threadId": "thread-0002",
+    "fromAddr": "no-reply@github.com",
+    "fromName": "GitHub",
+    "subject": "[mail-tracker] A new pull request was opened",
+    "snippet": "chirag opened pull request #12: Re-architect backend to Postgres + JWT auth. Review requested.",
+    "receivedAtMs": 1721590000000,
+    "isUnread": true,
+    "hasAttachment": false
+  },
+  {
+    "messageId": "fixture-0003",
+    "threadId": "thread-0003",
+    "fromAddr": "deals@bestbuy.com",
+    "fromName": "Best Buy",
+    "subject": "48-hour flash sale — up to 40% off laptops",
+    "snippet": "Huge savings this weekend only. Unsubscribe anytime. Shop the sale before it ends tonight!",
+    "receivedAtMs": 1721580000000,
+    "isUnread": false,
+    "hasAttachment": false
+  },
+  {
+    "messageId": "fixture-0004",
+    "threadId": "thread-0004",
+    "fromAddr": "calendar-notification@google.com",
+    "fromName": "Google Calendar",
+    "subject": "Invitation: Sprint planning @ Mon Jul 22, 10:00am",
+    "snippet": "You have been invited to a meeting. Sprint planning with the platform team. Please accept or decline.",
+    "receivedAtMs": 1721570000000,
+    "isUnread": true,
+    "hasAttachment": false
+  },
+  {
+    "messageId": "fixture-0005",
+    "threadId": "thread-0005",
+    "fromAddr": "security@google.com",
+    "fromName": "Google",
+    "subject": "Security alert: verify it was you",
+    "snippet": "We noticed a new sign-in. Enter the OTP code to verify your identity. If this wasn't you, secure your account.",
+    "receivedAtMs": 1721560000000,
+    "isUnread": true,
+    "hasAttachment": false
+  },
+  {
+    "messageId": "fixture-0006",
+    "threadId": "thread-0006",
+    "fromAddr": "mom@example.com",
+    "fromName": "Mom",
+    "subject": "Dinner on Sunday?",
+    "snippet": "Hi sweetheart, are you free for dinner this Sunday? Let me know what time works. Love you!",
+    "receivedAtMs": 1721550000000,
+    "isUnread": false,
+    "hasAttachment": false
+  },
+  {
+    "messageId": "fixture-0007",
+    "threadId": "thread-0007",
+    "fromAddr": "newsletter@techcrunch.com",
+    "fromName": "TechCrunch",
+    "subject": "This week in AI: the biggest launches",
+    "snippet": "Your weekly roundup of the most important stories in technology and startups. Read on for the highlights.",
+    "receivedAtMs": 1721540000000,
+    "isUnread": false,
+    "hasAttachment": false
+  },
+  {
+    "messageId": "fixture-0008",
+    "threadId": "thread-0008",
+    "fromAddr": "team@linear.app",
+    "fromName": "Linear",
+    "subject": "3 issues assigned to you are due this week",
+    "snippet": "You have work items approaching their due date. Open Linear to review your assigned issues and update status.",
+    "receivedAtMs": 1721530000000,
+    "isUnread": true,
+    "hasAttachment": false
+  }
+]

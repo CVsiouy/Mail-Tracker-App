@@ -1,0 +1,142 @@
+// Mail Tracker — Postgres schema (Prisma).
+//
+// Design notes:
+//  - `userId` is the identity anchor for every row; every query is scoped by it.
+//  - Gmail refresh tokens live ONLY server-side, AES-256-GCM encrypted, in their
+//    own table so a `User` read never leaks secrets.
+//  - `CategorizationJob` IS the durable background queue (drained via
+//    `FOR UPDATE SKIP LOCKED`); no Redis/BullMQ.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  googleSub String   @unique @map("google_sub")
+  email     String   @unique
+  name      String?
+  photoUrl  String?  @map("photo_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  gmailAccount GmailAccount?
+  sessions     Session[]
+  emails       Email[]
+  swipes       Swipe[]
+  pushTokens   PushToken[]
+  jobs         CategorizationJob[]
+
+  @@map("users")
+}
+
+// Server-held Gmail credentials. Refresh token stored encrypted (AES-256-GCM).
+model GmailAccount {
+  userId                 String    @id @map("user_id") @db.Uuid
+  email                  String
+  refreshTokenCiphertext Bytes?    @map("refresh_token_ciphertext")
+  refreshTokenNonce      Bytes?    @map("refresh_token_nonce")
+  refreshTokenTag        Bytes?    @map("refresh_token_tag")
+  historyId              String?   @map("history_id")
+  lastSyncedAt           DateTime? @map("last_synced_at")
+  syncStatus             String    @default("idle") @map("sync_status") // idle | syncing | error
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gmail_accounts")
+}
+
+// Revocable, rotating refresh sessions. We store only the SHA-256 hash.
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash Bytes     @unique @map("refresh_token_hash")
+  deviceId         String?   @map("device_id")
+  revokedAt        DateTime? @map("revoked_at")
+  expiresAt        DateTime  @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Email {
+  userId        String    @map("user_id") @db.Uuid
+  messageId     String    @map("message_id")
+  threadId      String?   @map("thread_id")
+  fromAddr      String    @map("from_addr")
+  fromName      String?   @map("from_name")
+  subject       String    @default("")
+  snippet       String    @default("")
+  receivedAt    DateTime  @map("received_at")
+  isUnread      Boolean   @default(true) @map("is_unread")
+  hasAttachment Boolean   @default(false) @map("has_attachment")
+  category      String    @default("General")
+  aiConfidence  Float?    @map("ai_confidence")
+  aiReason      String?   @map("ai_reason")
+  aiStatus      String    @default("pending") @map("ai_status") // pending | done | failed
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, messageId])
+  @@index([userId, receivedAt(sort: Desc)])
+  @@index([userId, category])
+  @@index([userId, aiStatus])
+  @@map("emails")
+}
+
+model Swipe {
+  userId    String   @map("user_id") @db.Uuid
+  messageId String   @map("message_id")
+  decision  String // archive | keep | trash | star
+  swipedAt  DateTime @map("swiped_at")
+  deviceId  String?  @map("device_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, messageId])
+  @@index([userId, swipedAt])
+  @@map("swipes")
+}
+
+model PushToken {
+  userId    String   @map("user_id") @db.Uuid
+  token     String
+  platform  String // ios | android
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, token])
+  @@map("push_tokens")
+}
+
+// Durable background job queue (drained via FOR UPDATE SKIP LOCKED).
+model CategorizationJob {
+  id        BigInt    @id @default(autoincrement())
+  userId    String    @map("user_id") @db.Uuid
+  messageId String    @map("message_id")
+  status    String    @default("queued") // queued | running | done | failed
+  attempts  Int       @default(0)
+  runAfter  DateTime  @default(now()) @map("run_after")
+  lockedAt  DateTime? @map("locked_at")
+  lastError String?   @map("last_error")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([status, runAfter])
+  @@map("categorization_jobs")
+}

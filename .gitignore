@@ -1,0 +1,64 @@
+# Local developer secrets -- single source of truth at solution root.
+.env
+.env.local
+*.env.local
+
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Rider / VS Code
+.vscode/
+*.swp
+
+# MAUI / platform artifacts
+*.apk
+*.aab
+*.ipa
+*.dSYM/
+*.app/
+Platforms/Android/Resources/**/generated/
+
+# Nuget restore
+project.lock.json
+*.nupkg
+*.snupkg
+
+# Rider / ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Node / TypeScript monorepo
+node_modules/
+**/dist/
+*.tsbuildinfo
+.npm/
+
+# Expo / React Native
+.expo/
+apps/mobile/android/
+apps/mobile/ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Env (keep .env.example)
+.env
+.env.*.local
+.env.example
+
+legacy/

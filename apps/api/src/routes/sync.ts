@@ -1,73 +1,75 @@
 import { Router } from "express";
-import { z } from "zod";
-import { getFirebaseDb } from "../services/firebaseAdmin.js";
-
-const emailMetaSchema = z.object({
-  messageId: z.string().min(1),
-  from: z.string(),
-  subject: z.string(),
-  snippet: z.string(),
-  category: z.string(),
-  receivedAtMs: z.number().int(),
-  isUnread: z.boolean(),
-  hasAttachment: z.boolean(),
-});
-
-const syncEmailsSchema = z.object({
-  userId: z.string().min(1),
-  emails: z.array(emailMetaSchema),
-});
-
-const syncSwipeSchema = z.object({
-  userId: z.string().min(1),
-  messageId: z.string().min(1),
-  decision: z.enum(["archive", "keep", "trash", "star"]),
-  atMs: z.number().int(),
-  deviceId: z.string().optional(),
-});
+import { syncSwipeRequestSchema } from "@mailtracker/shared";
+import { getPrisma } from "../db/client.js";
+import { syncUser } from "../services/gmail/syncUser.js";
 
 export const syncRouter = Router();
 
-syncRouter.post("/emails", async (req, res, next) => {
+/**
+ * POST /sync/run
+ * Triggers a server-side pull sync for the authenticated user (reads Gmail —
+ * or the fixture — into Postgres and enqueues categorization jobs).
+ */
+syncRouter.post("/run", async (req, res, next) => {
   try {
-    const db = await getFirebaseDb();
+    const db = getPrisma();
     if (!db) {
-      res.status(503).json({ error: "Firebase Realtime Database is not configured" });
+      res.status(503).json({ error: "Database is not configured" });
       return;
     }
-    const { userId, emails } = syncEmailsSchema.parse(req.body);
-    const updates: Record<string, unknown> = {};
-    for (const e of emails) {
-      updates[`users/${userId}/emails/${e.messageId}`] = {
-        from: e.from,
-        subject: e.subject,
-        snippet: e.snippet,
-        category: e.category,
-        receivedAtMs: e.receivedAtMs,
-        isUnread: e.isUnread,
-        hasAttachment: e.hasAttachment,
-      };
-    }
-    await db.ref().update(updates);
-    res.status(204).send();
+    const userId = req.auth!.userId;
+    const result = await syncUser(db, userId);
+    res.json(result);
   } catch (e) {
     next(e);
   }
 });
 
+/**
+ * POST /sync/swipes
+ * Records a swipe decision. The user is derived from the session — the client
+ * never supplies a userId.
+ */
 syncRouter.post("/swipes", async (req, res, next) => {
   try {
-    const db = await getFirebaseDb();
+    const db = getPrisma();
     if (!db) {
-      res.status(503).json({ error: "Firebase Realtime Database is not configured" });
+      res.status(503).json({ error: "Database is not configured" });
       return;
     }
-    const body = syncSwipeSchema.parse(req.body);
-    await db.ref(`users/${body.userId}/swipes/${body.messageId}`).set({
-      decision: body.decision,
-      atMs: body.atMs,
-      deviceId: body.deviceId ?? null,
+    const userId = req.auth!.userId;
+    const body = syncSwipeRequestSchema.parse(req.body);
+
+    await db.swipe.upsert({
+      where: { userId_messageId: { userId, messageId: body.messageId } },
+      create: {
+        userId,
+        messageId: body.messageId,
+        decision: body.decision,
+        swipedAt: new Date(body.atMs),
+        deviceId: body.deviceId ?? null,
+      },
+      update: {
+        decision: body.decision,
+        swipedAt: new Date(body.atMs),
+        deviceId: body.deviceId ?? null,
+      },
     });
+
+    // Reflect the decision on the cached email so the inbox stays consistent.
+    if (body.decision === "archive" || body.decision === "trash") {
+      await db.email
+        .delete({ where: { userId_messageId: { userId, messageId: body.messageId } } })
+        .catch(() => undefined);
+    } else if (body.decision === "keep") {
+      await db.email
+        .update({
+          where: { userId_messageId: { userId, messageId: body.messageId } },
+          data: { isUnread: false },
+        })
+        .catch(() => undefined);
+    }
+
     res.status(204).send();
   } catch (e) {
     next(e);

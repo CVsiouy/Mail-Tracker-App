@@ -1,40 +1,49 @@
-import { createHash } from "node:crypto";
 import { Router } from "express";
 import { z, ZodError } from "zod";
+import { registerPushRequestSchema } from "@mailtracker/shared";
 import { logger } from "../logger.js";
-import { getFirebaseDb, sendFcmTestNotification } from "../services/firebaseAdmin.js";
-
-const registerSchema = z.object({
-  userId: z.string().min(1),
-  fcmToken: z.string().min(1),
-  platform: z.string().min(1),
-});
+import { getPrisma } from "../db/client.js";
+import { appConfig } from "../config/env.js";
+import { sendFcmTestNotification } from "../services/firebaseAdmin.js";
 
 export const pushRouter = Router();
 
+/**
+ * POST /push/register
+ * Stores an FCM token for the authenticated user in Postgres.
+ */
 pushRouter.post("/register", async (req, res, next) => {
   try {
-    const db = await getFirebaseDb();
+    const db = getPrisma();
     if (!db) {
-      res.status(503).json({ error: "Firebase Realtime Database is not configured" });
+      res.status(503).json({ error: "Database is not configured" });
       return;
     }
-    const body = registerSchema.parse(req.body);
-    const tokenHash = createHash("sha256").update(body.fcmToken).digest("hex").slice(0, 32);
-    const now = Date.now();
-    await db.ref(`users/${body.userId}/devices/${tokenHash}`).set({
-      fcmToken: body.fcmToken,
-      platform: body.platform,
-      lastSeenMs: now,
+    const userId = req.auth!.userId;
+    const body = registerPushRequestSchema.parse(req.body);
+
+    await db.pushToken.upsert({
+      where: { userId_token: { userId, token: body.fcmToken } },
+      create: { userId, token: body.fcmToken, platform: body.platform },
+      update: { platform: body.platform },
     });
+
     res.status(204).send();
   } catch (e) {
     next(e);
   }
 });
 
+/**
+ * POST /push/test
+ * Sends a test FCM notification (requires Firebase to be configured for FCM).
+ */
 pushRouter.post("/test", async (req, res, next) => {
   try {
+    if (!appConfig.firebase.isConfigured) {
+      res.status(503).json({ error: "Firebase (FCM) is not configured" });
+      return;
+    }
     const schema = z.object({
       token: z.string().min(1),
       title: z.string().optional(),

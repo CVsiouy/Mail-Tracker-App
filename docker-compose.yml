@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mail-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mailtracker
+      POSTGRES_PASSWORD: mailtracker
+      POSTGRES_DB: mailtracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailtracker -d mailtracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mail-tracker-api
+    restart: unless-stopped
+    ports:
+      - "5080:5080"
+    environment:
+      NODE_ENV: development
+      API_PORT: "5080"
+      API_HOST: 0.0.0.0
+      # Local dev defaults — no .env required. Override in production.
+      DATABASE_URL: postgres://mailtracker:mailtracker@db:5432/mailtracker
+      SESSION_JWT_SECRET: dev-session-secret-change-me-in-prod
+      # 32-byte key, base64 — DEV ONLY. Rotate/KMS-wrap in production.
+      TOKEN_ENC_KEY: IU5yHPYrOhAuOoXQwAV3Gepd1Dxm7hhffud8qyrZfAQ=
+      DEV_TRUST_UNVERIFIED_GOOGLE: "true"
+      WORKER_ENABLED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages/shared/src:/app/packages/shared/src
+    # Apply migrations, then start the dev server.
+    command: sh -c "npm run db:deploy --prefix apps/api && npm run dev:api"
+
+  mobile:
+    build:
+      context: .
+      dockerfile: Dockerfile.mobile
+    container_name: mail-tracker-mobile
+    ports:
+      - "8081:8081"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./apps/mobile/src:/app/apps/mobile/src
+      - ./apps/mobile/App.tsx:/app/apps/mobile/App.tsx
+      - ./apps/mobile/app.config.js:/app/apps/mobile/app.config.js
+      - ./packages/shared/src:/app/packages/shared/src
+
+volumes:
+  db-data:

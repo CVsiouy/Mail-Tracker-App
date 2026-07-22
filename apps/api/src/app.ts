@@ -9,12 +9,17 @@ const require = createRequire(import.meta.url);
 const pinoHttp = require("pino-http") as (opts?: PinoHttpOptions) => express.RequestHandler;
 import { appConfig } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { createSharedSecretAuthMiddleware } from "./middleware/sharedSecretAuth.js";
+import { createRequireAuthMiddleware } from "./middleware/requireAuth.js";
 import { logger } from "./logger.js";
 import { healthRouter } from "./routes/health.js";
+import { authRouter } from "./routes/auth.js";
 import { aiRouter } from "./routes/ai.js";
 import { syncRouter } from "./routes/sync.js";
+import { emailsRouter } from "./routes/emails.js";
 import { pushRouter } from "./routes/push.js";
+
+// Routes reachable WITHOUT a session (health + login/refresh/logout).
+const PUBLIC_PATHS = new Set(["/health", "/auth/google", "/auth/refresh", "/auth/logout"]);
 
 export function createApp() {
   const app = express();
@@ -42,14 +47,18 @@ export function createApp() {
   );
 
   app.use(healthRouter);
+  app.use("/auth", authRouter);
 
-  const auth = createSharedSecretAuthMiddleware({
-    skip: (path) => path === "/health",
-  });
-  app.use(auth);
+  // Everything below requires a valid session access token.
+  app.use(
+    createRequireAuthMiddleware({
+      skip: (path) => PUBLIC_PATHS.has(path) || path.startsWith("/auth/"),
+    }),
+  );
 
   app.use("/ai", aiRouter);
   app.use("/sync", syncRouter);
+  app.use("/emails", emailsRouter);
   app.use("/push", pushRouter);
 
   app.use((_req, res) => {

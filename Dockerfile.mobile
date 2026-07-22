@@ -1,0 +1,37 @@
+# Use Node.js 20 LTS as the base image
+FROM node:20-slim
+
+# Install system dependencies needed for compiling native packages
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy configuration and shared package
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared ./packages/shared
+COPY apps/mobile/package.json ./apps/mobile/
+
+# Install dependencies for the shared package first to get the typescript compiler (tsc)
+RUN npm install --prefix packages/shared --legacy-peer-deps
+
+# Build the shared package
+RUN npm run build --prefix packages/shared
+
+# Switch to the mobile app directory and install dependencies locally
+WORKDIR /app/apps/mobile
+RUN npm install --legacy-peer-deps
+
+# Copy the mobile app source files
+COPY apps/mobile ./
+
+# Expose the Metro Bundler port
+EXPOSE 8081
+
+# Command to run Expo in tunnel mode
+CMD ["npx", "expo", "start", "--tunnel"]
